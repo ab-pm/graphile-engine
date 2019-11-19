@@ -113,6 +113,18 @@ export interface GraphileObjectTypeConfig<
       ) => GraphQLFieldConfigMap<TSource, TContext, TArgs>);
 }
 
+export interface GraphileInterfaceTypeConfig<
+  TSource,
+  TContext,
+  TArgs = { [key: string]: any }
+> extends Omit<GraphQLInterfaceTypeConfig<TSource, TContext, TArgs>, "fields"> {
+  fields?:
+    | GraphQLFieldConfigMap<TSource, TContext, TArgs>
+    | ((
+        context: ContextGraphQLInterfaceTypeFields
+      ) => GraphQLFieldConfigMap<TSource, TContext, TArgs>);
+}
+
 export interface GraphileInputObjectTypeConfig
   extends Omit<GraphQLInputObjectTypeConfig, "fields"> {
   fields?:
@@ -204,12 +216,12 @@ export interface BuildBase {
 
   newWithHooks(
     constructor: typeof GraphQLInterfaceType,
-    spec: GraphQLInterfaceTypeConfig<any, any, any>,
+    spec: GraphileInterfaceTypeConfig<any, any, any>,
     scope: ScopeGraphQLInterfaceType
   ): GraphQLInterfaceType;
   newWithHooks(
     constructor: typeof GraphQLInterfaceType,
-    spec: GraphQLInterfaceTypeConfig<any, any, any>,
+    spec: GraphileInterfaceTypeConfig<any, any, any>,
     scope: ScopeGraphQLInterfaceType,
     performNonEmptyFieldsCheck?: boolean
   ): GraphQLInterfaceType | null;
@@ -485,9 +497,68 @@ export interface ContextGraphQLObjectTypeFieldsFieldArgs
 }
 
 export interface ScopeGraphQLInterfaceType extends Scope {}
-export interface ContextGraphQLInterfaceType extends Context {
+export interface ContextGraphQLInterfaceTypeBase extends Context {
   scope: ScopeGraphQLInterfaceType;
   type: "GraphQLInterfaceType";
+}
+
+export interface ContextGraphQLInterfaceType
+  extends ContextGraphQLInterfaceTypeBase {
+  /*
+  addDataGeneratorForField: (
+    fieldName: string,
+    fn: DataGeneratorFunction
+  ) => void;
+  */
+}
+
+export interface ScopeGraphQLInterfaceTypeFields
+  extends ScopeGraphQLInterfaceType {}
+export interface ContextGraphQLInterfaceTypeFields
+  extends ContextGraphQLInterfaceType {
+  scope: ScopeGraphQLInterfaceTypeFields;
+  /*
+  addDataGeneratorForField: (
+    fieldName: string,
+    fn: DataGeneratorFunction
+  ) => void;
+  */
+  Self: GraphQLInterfaceType;
+  GraphQLInterfaceType: GraphQLInterfaceTypeConfig<any, any>;
+  /*
+  fieldWithHooks: FieldWithHooksFunction;
+  */
+}
+
+export interface ScopeGraphQLInterfaceTypeFieldsField
+  extends ScopeGraphQLInterfaceType {
+  fieldName?: string;
+}
+export interface ScopeGraphQLInterfaceTypeFieldsFieldWithFieldName
+  extends ScopeGraphQLInterfaceTypeFieldsField {
+  fieldName: string;
+}
+export interface ContextGraphQLInterfaceTypeFieldsField
+  extends ContextGraphQLInterfaceTypeBase {
+  scope: ScopeGraphQLInterfaceTypeFieldsFieldWithFieldName;
+  Self: GraphQLInterfaceType;
+  /*
+  addDataGenerator: (fn: DataGeneratorFunction) => void;
+  addArgDataGenerator: (fn: ArgDataGeneratorFunction) => void;
+  getDataFromParsedResolveInfoFragment: GetDataFromParsedResolveInfoFragmentFunction;
+  */
+}
+
+export interface ScopeGraphQLInterfaceTypeFieldsFieldArgs
+  extends ScopeGraphQLInterfaceTypeFieldsField {
+  fieldName: string;
+}
+export interface ContextGraphQLInterfaceTypeFieldsFieldArgs
+  extends ContextGraphQLInterfaceTypeFieldsField {
+  scope: ScopeGraphQLInterfaceTypeFieldsFieldArgs;
+  Self: GraphQLInterfaceType;
+  field: GraphQLFieldConfig<any, any>;
+  returnType: GraphQLOutputType;
 }
 
 export interface ScopeGraphQLUnionType extends Scope {}
@@ -573,6 +644,10 @@ export type SomeScope =
   | ScopeGraphQLObjectTypeFieldsFieldWithFieldName
   | ScopeGraphQLObjectTypeFieldsFieldArgs
   | ScopeGraphQLInterfaceType
+  | ScopeGraphQLInterfaceTypeFields
+  | ScopeGraphQLInterfaceTypeFieldsField
+  | ScopeGraphQLInterfaceTypeFieldsFieldWithFieldName
+  | ScopeGraphQLInterfaceTypeFieldsFieldArgs
   | ScopeGraphQLUnionType
   | ScopeGraphQLUnionTypeTypes
   | ScopeGraphQLInputObjectType

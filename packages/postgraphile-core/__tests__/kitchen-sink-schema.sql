@@ -1,5 +1,5 @@
 -- WARNING: this database is shared with graphile-utils, don't run the tests in parallel!
-drop schema if exists a, b, c, d, inheritence, smart_comment_relations, ranges, index_expressions, simple_collections, live_test, large_bigint, network_types, named_query_builder cascade;
+drop schema if exists a, b, c, d, inheritence, smart_comment_relations, ranges, index_expressions, simple_collections, live_test, large_bigint, network_types, named_query_builder, sw, abstract cascade;
 drop extension if exists tablefunc;
 drop extension if exists intarray;
 drop extension if exists hstore;
@@ -1092,3 +1092,32 @@ create table named_query_builder.toy_categories (
   category_id int not null references named_query_builder.categories,
   approved boolean not null
 );
+
+/******************************************************************************/
+
+create schema sw;
+
+create table sw.character (
+  id serial primary key,
+  name text not null
+);
+comment on table sw.character is E'@interface';
+create table sw.person (
+  id int primary key references sw.character,
+  total_credits int
+);
+create table sw.droid (
+  id int primary key references sw.character,
+  primary_function text
+);
+
+create schema abstract;
+create type abstract.named_entity as (
+  name text
+);
+comment on type abstract.named_entity is E'@interface';
+create function abstract.global_thing() returns abstract.named_entity as 'SELECT NULL' language sql stable;
+create table abstract.either (
+  id serial primary key
+);
+comment on table abstract.either is E'@union';

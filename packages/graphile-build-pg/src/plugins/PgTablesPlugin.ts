@@ -1,6 +1,8 @@
 import {
   Plugin,
   GraphileObjectTypeConfig,
+  GraphileInterfaceTypeConfig,
+  GraphileUnionTypeConfig,
   ScopeGraphQLObjectType,
 } from "graphile-build";
 import { PgType, PgAttribute } from "./PgIntrospectionPlugin";
@@ -110,13 +112,15 @@ export default (function PgTablesPlugin(
         gql2pg,
         graphql: {
           GraphQLObjectType,
+          GraphQLInterfaceType,
+          GraphQLUnionType,
           GraphQLNonNull,
           GraphQLID,
           GraphQLList,
           GraphQLInputObjectType,
-          GraphQLInterfaceType,
           GraphQLScalarType,
           isInputType,
+          getNamedType,
         },
 
         inflection,
@@ -141,15 +145,22 @@ export default (function PgTablesPlugin(
           primaryKeyConstraint && primaryKeyConstraint.keyAttributes;
         const attributes = table.attributes;
         const tableTypeName = inflection.tableType(table);
-        const shouldHaveNodeId: boolean =
+        const shouldHaveNodeId = !!(
           nodeIdFieldName &&
           table.isSelectable &&
           table.namespace &&
           primaryKeys &&
           primaryKeys.length
-            ? true
-            : false;
-        let TableType: import("graphql").GraphQLObjectType;
+        );
+        const isInterfaceType =
+          !!table.tags.interface || !!tablePgType.tags.interface;
+        const isUnionType = !!table.tags.union || !!tablePgType.tags.union;
+        if (isInterfaceType && isUnionType) {
+          throw new Error(
+            `Type ${tableTypeName} cannot be both an interface and a union`
+          );
+        }
+        let TableType: import("graphql").GraphQLCompositeType;
         let TablePatchType:
           | import("graphql").GraphQLInputObjectType
           | null = null;
@@ -168,265 +179,312 @@ export default (function PgTablesPlugin(
                 `Register was called but there's already a mapper in place for '${tablePgType.id}'!`
               );
             }
-            const tableSpec: GraphileObjectTypeConfig<any, any> = {
-              description: table.description || tablePgType.description || null,
-              name: tableTypeName,
-              interfaces: () => {
-                const NodeInterface =
-                  shouldHaveNodeId && getTypeByName(inflection.builtin("Node"));
-                if (NodeInterface instanceof GraphQLInterfaceType) {
-                  return [NodeInterface];
-                } else {
-                  return [];
+            const description =
+              table.description || tablePgType.description || null;
+            const scope = {
+              __origin: `Adding table type for ${describePgEntity(
+                table
+              )}. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
+                table,
+                {
+                  name: "newNameHere",
                 }
-              },
-              fields: ({ addDataGeneratorForField, Self }) => {
-                const fields = {};
-                if (shouldHaveNodeId) {
-                  // Enable nodeId interface
-                  addDataGeneratorForField(nodeIdFieldName, () => {
-                    return {
-                      pgQuery: queryBuilder => {
-                        queryBuilder.selectIdentifiers(table);
+              )}`,
+              pgIntrospection: table,
+              isPgRowType: table.isSelectable,
+              isPgCompoundType: !table.isSelectable, // TODO:v5: remove - typo
+              isPgCompositeType: !table.isSelectable,
+            };
+            if (isUnionType) {
+              const tableSpec: GraphileUnionTypeConfig<any, any> = {
+                name: tableTypeName,
+                description,
+                types: [],
+                // resolveType() {},
+              };
+              TableType = newWithHooks(GraphQLUnionType, tableSpec, scope);
+            } else if (isInterfaceType) {
+              const tableSpec: GraphileInterfaceTypeConfig<any, any> = {
+                name: tableTypeName,
+                description,
+                // interfaces: [],
+                fields: {},
+                // resolveType() {},
+              };
+              TableType = newWithHooks(GraphQLInterfaceType, tableSpec, scope);
+            } else {
+              const tableSpec: GraphileObjectTypeConfig<any, any> = {
+                description,
+                name: tableTypeName,
+                interfaces: () => {
+                  const NodeInterface =
+                    shouldHaveNodeId &&
+                    getTypeByName(inflection.builtin("Node"));
+                  if (NodeInterface instanceof GraphQLInterfaceType) {
+                    return [NodeInterface];
+                  } else {
+                    return [];
+                  }
+                },
+                fields: ({ addDataGeneratorForField, Self }) => {
+                  const fields = {};
+                  if (shouldHaveNodeId) {
+                    // Enable nodeId interface
+                    addDataGeneratorForField(nodeIdFieldName, () => {
+                      return {
+                        pgQuery: queryBuilder => {
+                          queryBuilder.selectIdentifiers(table);
+                        },
+                      };
+                    });
+                    fields[nodeIdFieldName] = {
+                      description:
+                        "A globally unique identifier. Can be used in various places throughout the system to identify this single value.",
+                      type: new GraphQLNonNull(GraphQLID),
+                      resolve(data: any) {
+                        const identifiers: (string | number)[] | null =
+                          data.__identifiers;
+                        if (!identifiers) {
+                          return null;
+                        }
+                        /*
+                         * For bigint we want NodeIDs to be the same as int up
+                         * to the limits of int, and only to be strings after
+                         * that point.
+                         */
+                        const finalIdentifiers = identifiers.map(
+                          (identifier, idx) => {
+                            const key = primaryKeys[idx];
+                            const type = key.type.domainBaseType || key.type;
+                            if (type.id === "20" /* bigint */) {
+                              /*
+                               * When migrating from 'int' to 'bigint' we want
+                               * to maintain nodeIDs in the safe range before
+                               * moving to strings for larger numbers. Since we
+                               * can represent ints up to MAX_SAFE_INTEGER
+                               * (2^53 - 1) fine, we're using that as the
+                               * boundary.
+                               */
+                              const int = parseInt(String(identifier), 10);
+                              if (
+                                int >= -Number.MAX_SAFE_INTEGER &&
+                                int <= Number.MAX_SAFE_INTEGER
+                              ) {
+                                return int;
+                              }
+                            }
+                            return identifier;
+                          }
+                        );
+                        return getNodeIdForTypeAndIdentifiers(
+                          Self,
+                          ...finalIdentifiers
+                        );
                       },
                     };
-                  });
-                  fields[nodeIdFieldName] = {
-                    description:
-                      "A globally unique identifier. Can be used in various places throughout the system to identify this single value.",
-                    type: new GraphQLNonNull(GraphQLID),
-                    resolve(data: any) {
-                      const identifiers: (string | number)[] | null =
-                        data.__identifiers;
-                      if (!identifiers) {
-                        return null;
-                      }
-                      /*
-                       * For bigint we want NodeIDs to be the same as int up
-                       * to the limits of int, and only to be strings after
-                       * that point.
-                       */
-                      const finalIdentifiers = identifiers.map(
-                        (identifier, idx) => {
-                          const key = primaryKeys[idx];
-                          const type = key.type.domainBaseType || key.type;
-                          if (type.id === "20" /* bigint */) {
-                            /*
-                             * When migrating from 'int' to 'bigint' we want
-                             * to maintain nodeIDs in the safe range before
-                             * moving to strings for larger numbers. Since we
-                             * can represent ints up to MAX_SAFE_INTEGER
-                             * (2^53 - 1) fine, we're using that as the
-                             * boundary.
-                             */
-                            const int = parseInt(String(identifier), 10);
-                            if (
-                              int >= -Number.MAX_SAFE_INTEGER &&
-                              int <= Number.MAX_SAFE_INTEGER
-                            ) {
-                              return int;
-                            }
-                          }
-                          return identifier;
-                        }
-                      );
-
-                      return getNodeIdForTypeAndIdentifiers(
-                        Self,
-                        ...finalIdentifiers
-                      );
-                    },
-                  };
-                }
-                return fields;
-              },
-            };
-            const tmpTableType = newWithHooks(
-              GraphQLObjectType,
-              tableSpec,
-
-              {
-                __origin: `Adding table type for ${describePgEntity(
-                  table
-                )}. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
-                  table,
-                  {
-                    name: "newNameHere",
                   }
-                )}`,
-                pgIntrospection: table,
-                isPgRowType: table.isSelectable,
-                isPgCompoundType: !table.isSelectable, // TODO:v5: remove - typo
-                isPgCompositeType: !table.isSelectable,
-              }
-            );
-            if (!tmpTableType) {
+                  return fields;
+                },
+              };
+
+              TableType = newWithHooks(GraphQLObjectType, tableSpec, scope);
+            }
+            if (!TableType) {
               throw new Error(
-                `Failed to construct TableType for '${tableSpec.name}'`
+                `Failed to construct TableType for '${tableTypeName}'`
               );
             }
-            TableType = tmpTableType;
-
             cb(TableType);
-            const pgCreateInputFields: FieldSpecMap = {};
-            const pgPatchInputFields: FieldSpecMap = {};
-            const pgBaseInputFields: FieldSpecMap = {};
-            newWithHooks(
-              GraphQLInputObjectType,
-              {
-                description: `An input for mutations affecting \`${tableTypeName}\``,
-                name: inflection.inputType(TableType.name),
-              },
+            if (!isInterfaceType && !isUnionType) {
+              const pgCreateInputFields: FieldSpecMap = {};
+              const pgPatchInputFields: FieldSpecMap = {};
+              const pgBaseInputFields: FieldSpecMap = {};
+              newWithHooks(
+                GraphQLInputObjectType,
+                {
+                  description: `An input for mutations affecting \`${tableTypeName}\``,
+                  name: inflection.inputType(TableType.name),
+                },
 
-              {
-                __origin: `Adding table input type for ${describePgEntity(
-                  table
-                )}. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
-                  table,
+                {
+                  __origin: `Adding table input type for ${describePgEntity(
+                    table
+                  )}. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
+                    table,
+                    {
+                      name: "newNameHere",
+                    }
+                  )}`,
+                  pgIntrospection: table,
+                  isInputType: true,
+                  isPgRowType: table.isSelectable,
+                  isPgCompoundType: !table.isSelectable,
+                  pgAddSubfield(
+                    fieldName,
+                    attrName,
+                    pgType,
+                    spec,
+                    typeModifier
+                  ) {
+                    pgCreateInputFields[fieldName] = {
+                      name: attrName,
+                      type: pgType,
+                      typeModifier,
+                    };
+
+                    return spec;
+                  },
+                },
+                true // If no fields, skip type automatically
+              );
+
+              if (table.isSelectable) {
+                // XXX: these don't belong here; but we have to keep them here
+                // because third-party code depends on `getTypeByName` to find
+                // them; so we have to register them ahead of time. A better
+                // approach is to use the modifier to specify the type you need,
+                // 'patch' or 'base', so they can be registered just in time.
+                TablePatchType = newWithHooks(
+                  GraphQLInputObjectType,
                   {
-                    name: "newNameHere",
+                    description: `Represents an update to a \`${tableTypeName}\`. Fields that are set will be updated.`,
+                    name: inflection.patchType(TableType.name),
+                  },
+                  {
+                    __origin: `Adding table patch type for ${describePgEntity(
+                      table
+                    )}. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
+                      table,
+                      {
+                        name: "newNameHere",
+                      }
+                    )}`,
+                    pgIntrospection: table,
+                    isPgRowType: table.isSelectable,
+                    isPgCompoundType: !table.isSelectable,
+                    isPgPatch: true,
+                    pgAddSubfield(
+                      fieldName,
+                      attrName,
+                      pgType,
+                      spec,
+                      typeModifier
+                    ) {
+                      pgPatchInputFields[fieldName] = {
+                        name: attrName,
+                        type: pgType,
+                        typeModifier,
+                      };
+                      return spec;
+                    },
+                  },
+                  true // Safe to skip this if no fields support updating
+                );
+                TableBaseInputType = newWithHooks(
+                  GraphQLInputObjectType,
+                  {
+                    description: `An input representation of \`${tableTypeName}\` with nullable fields.`,
+                    name: inflection.baseInputType(TableType.name),
+                  },
+                  {
+                    __origin: `Adding table base input type for ${describePgEntity(
+                      table
+                    )}. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
+                      table,
+                      {
+                        name: "newNameHere",
+                      }
+                    )}`,
+                    pgIntrospection: table,
+                    isPgRowType: table.isSelectable,
+                    isPgCompoundType: !table.isSelectable,
+                    isPgBaseInput: true,
+                    pgAddSubfield(
+                      fieldName,
+                      attrName,
+                      pgType,
+                      spec,
+                      typeModifier
+                    ) {
+                      pgBaseInputFields[fieldName] = {
+                        name: attrName,
+                        type: pgType,
+                        typeModifier,
+                      };
+                      return spec;
+                    },
                   }
-                )}`,
-                pgIntrospection: table,
-                isInputType: true,
-                isPgRowType: table.isSelectable,
-                isPgCompoundType: !table.isSelectable,
-                pgAddSubfield(fieldName, attrName, pgType, spec, typeModifier) {
-                  pgCreateInputFields[fieldName] = {
-                    name: attrName,
-                    type: pgType,
-                    typeModifier,
+                );
+              }
+
+              pg2GqlMapper[tablePgType.id] = {
+                map: _ => _,
+                unmap: (obj, modifier) => {
+                  let fieldLookup: FieldSpecMap;
+                  if (modifier === "patch") {
+                    fieldLookup = pgPatchInputFields;
+                  } else if (modifier === "base") {
+                    fieldLookup = pgBaseInputFields;
+                  } else {
+                    fieldLookup = pgCreateInputFields;
+                  }
+
+                  const attr2sql = (attr: PgAttribute) => {
+                    // TODO: this should use `fieldInput[*].name` to find the attribute
+                    const fieldName = inflection.column(attr);
+                    const inputField = fieldLookup[fieldName];
+                    const v = obj[fieldName];
+                    if (inputField && v != null) {
+                      const { type, typeModifier } = inputField;
+                      return sql.fragment`${gql2pg(
+                        v,
+                        type,
+                        typeModifier
+                      )}::${sql.identifier(type.namespaceName, type.name)}`;
+                    } else {
+                      return sql.null; // TODO: return default instead.
+                    }
                   };
 
-                  return spec;
+                  return sql.fragment`row(${sql.join(
+                    attributes.map(attr2sql),
+                    ","
+                  )})::${sql.identifier(
+                    tablePgType.namespaceName,
+                    tablePgType.name
+                  )}`;
                 },
-              },
-
-              true // If no fields, skip type automatically
-            );
-
-            if (table.isSelectable) {
-              // XXX: these don't belong here; but we have to keep them here
-              // because third-party code depends on `getTypeByName` to find
-              // them; so we have to register them ahead of time. A better
-              // approach is to use the modifier to specify the type you need,
-              // 'patch' or 'base', so they can be registered just in time.
-              TablePatchType = newWithHooks(
-                GraphQLInputObjectType,
-                {
-                  description: `Represents an update to a \`${tableTypeName}\`. Fields that are set will be updated.`,
-                  name: inflection.patchType(TableType.name),
-                },
-
-                {
-                  __origin: `Adding table patch type for ${describePgEntity(
-                    table
-                  )}. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
-                    table,
-                    {
-                      name: "newNameHere",
+              };
+              pgRegisterGqlInputTypeByTypeId(
+                tablePgType.id,
+                (_set, modifier): import("graphql").GraphQLInputType | null => {
+                  // This must come first, it triggers creation of all the types
+                  const TableType = pgGetGqlTypeByTypeIdAndModifier(
+                    tablePgType.id,
+                    null
+                  );
+                  // This must come after the pgGetGqlTypeByTypeIdAndModifier call
+                  if (modifier === "patch") {
+                    // TODO: v5: move the definition from above down here
+                    return TablePatchType;
+                  }
+                  if (modifier === "base") {
+                    // TODO: v5: move the definition from above down here
+                    return TableBaseInputType;
+                  }
+                  if (TableType) {
+                    const type = getTypeByName(
+                      inflection.inputType(getNamedType(TableType).name)
+                    );
+                    if (isInputType(type)) {
+                      return type;
                     }
-                  )}`,
-                  pgIntrospection: table,
-                  isPgRowType: table.isSelectable,
-                  isPgCompoundType: !table.isSelectable,
-                  isPgPatch: true,
-                  pgAddSubfield(
-                    fieldName,
-                    attrName,
-                    pgType,
-                    spec,
-                    typeModifier
-                  ) {
-                    pgPatchInputFields[fieldName] = {
-                      name: attrName,
-                      type: pgType,
-                      typeModifier,
-                    };
-
-                    return spec;
-                  },
+                  }
+                  return null;
                 },
-
-                true // Safe to skip this if no fields support updating
-              );
-              TableBaseInputType = newWithHooks(
-                GraphQLInputObjectType,
-                {
-                  description: `An input representation of \`${tableTypeName}\` with nullable fields.`,
-                  name: inflection.baseInputType(TableType.name),
-                },
-
-                {
-                  __origin: `Adding table base input type for ${describePgEntity(
-                    table
-                  )}. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
-                    table,
-                    {
-                      name: "newNameHere",
-                    }
-                  )}`,
-                  pgIntrospection: table,
-                  isPgRowType: table.isSelectable,
-                  isPgCompoundType: !table.isSelectable,
-                  isPgBaseInput: true,
-                  pgAddSubfield(
-                    fieldName,
-                    attrName,
-                    pgType,
-                    spec,
-                    typeModifier
-                  ) {
-                    pgBaseInputFields[fieldName] = {
-                      name: attrName,
-                      type: pgType,
-                      typeModifier,
-                    };
-
-                    return spec;
-                  },
-                }
+                true
               );
             }
-
-            pg2GqlMapper[tablePgType.id] = {
-              map: _ => _,
-              unmap: (obj, modifier) => {
-                let fieldLookup: FieldSpecMap;
-                if (modifier === "patch") {
-                  fieldLookup = pgPatchInputFields;
-                } else if (modifier === "base") {
-                  fieldLookup = pgBaseInputFields;
-                } else {
-                  fieldLookup = pgCreateInputFields;
-                }
-
-                const attr2sql = (attr: PgAttribute) => {
-                  // TODO: this should use `fieldInput[*].name` to find the attribute
-                  const fieldName = inflection.column(attr);
-                  const inputField = fieldLookup[fieldName];
-                  const v = obj[fieldName];
-                  if (inputField && v != null) {
-                    const { type, typeModifier } = inputField;
-                    return sql.fragment`${gql2pg(
-                      v,
-                      type,
-                      typeModifier
-                    )}::${sql.identifier(type.namespaceName, type.name)}`;
-                  } else {
-                    return sql.null; // TODO: return default instead.
-                  }
-                };
-
-                return sql.fragment`row(${sql.join(
-                  attributes.map(attr2sql),
-                  ","
-                )})::${sql.identifier(
-                  tablePgType.namespaceName,
-                  tablePgType.name
-                )}`;
-              },
-            };
 
             const edgeSpec: GraphileObjectTypeConfig<any, any> = {
               description: `A \`${tableTypeName}\` edge in the connection.`,
@@ -666,37 +724,6 @@ export default (function PgTablesPlugin(
           true
         );
 
-        pgRegisterGqlInputTypeByTypeId(
-          tablePgType.id,
-          (_set, modifier): import("graphql").GraphQLInputType | null => {
-            // This must come first, it triggers creation of all the types
-            const TableType = pgGetGqlTypeByTypeIdAndModifier(
-              tablePgType.id,
-              null
-            );
-
-            // This must come after the pgGetGqlTypeByTypeIdAndModifier call
-            if (modifier === "patch") {
-              // TODO: v5: move the definition from above down here
-              return TablePatchType;
-            }
-            if (modifier === "base") {
-              // TODO: v5: move the definition from above down here
-              return TableBaseInputType;
-            }
-            if (TableType) {
-              const type = getTypeByName(
-                inflection.inputType(build.graphql.getNamedType(TableType).name)
-              );
-              if (isInputType(type)) {
-                return type;
-              }
-            }
-            return null;
-          },
-          true
-        );
-
         if (arrayTablePgType) {
           // Note: these do not return
           //
@@ -725,7 +752,7 @@ export default (function PgTablesPlugin(
 
           pgRegisterGqlInputTypeByTypeId(
             arrayTablePgType.id,
-            (_set, modifier) => {
+            (_set, modifier): import("graphql").GraphQLInputType | null => {
               const RelevantTableInputType = pgGetGqlInputTypeByTypeIdAndModifier(
                 tablePgType.id,
                 modifier
@@ -734,6 +761,7 @@ export default (function PgTablesPlugin(
               if (RelevantTableInputType) {
                 return new GraphQLList(RelevantTableInputType);
               }
+              return null;
             },
             true
           );

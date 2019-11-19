@@ -36,6 +36,7 @@ export {
   Plugin,
   GraphileBuildOptions,
   GraphileObjectTypeConfig,
+  GraphileInterfaceTypeConfig,
   GraphileInputObjectTypeConfig,
   GraphileUnionTypeConfig,
   FieldWithHooksFunction,
