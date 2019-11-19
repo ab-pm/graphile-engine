@@ -15,11 +15,6 @@ interface Node {
 
 """The root query type which gives access points into the data universe."""
 type Query implements Node {
-  """Reads a single \`Either\` using its globally unique \`ID\`."""
-  either(
-    """The globally unique \`ID\` to be used in selecting a single \`Either\`."""
-    nodeId: ID!
-  ): Either
   eitherById(id: Int!): Either
   globalThing: NamedEntity
 
@@ -157,12 +152,6 @@ type Query implements Node {
     """The method to use when ordering \`Person\`."""
     orderBy: [PeopleOrderBy!]
   ): [Person!]
-
-  """Reads a single \`Character\` using its globally unique \`ID\`."""
-  character(
-    """The globally unique \`ID\` to be used in selecting a single \`Character\`."""
-    nodeId: ID!
-  ): Character
   characterById(id: Int!): Character
 
   """Reads a single \`Droid\` using its globally unique \`ID\`."""

@@ -120,7 +120,7 @@ export default (async function PgRowNode(builder, { subscriptions }) {
         pgIntrospectionResultsByKind: introspectionResultsByKind,
         pgSql: sql,
         gql2pg,
-        graphql: { GraphQLNonNull, GraphQLID, getNamedType },
+        graphql: { GraphQLNonNull, GraphQLID, getNamedType, isAbstractType },
         inflection,
         pgQueryFromResolveData: queryFromResolveData,
         pgOmit: omit,
@@ -153,8 +153,7 @@ export default (async function PgRowNode(builder, { subscriptions }) {
             table.namespace.name,
             table.name
           );
-
-          if (TableType) {
+          if (TableType && !isAbstractType(TableType)) {
             const primaryKeyConstraint = table.primaryKeyConstraint;
             if (!primaryKeyConstraint) {
               return memo;
