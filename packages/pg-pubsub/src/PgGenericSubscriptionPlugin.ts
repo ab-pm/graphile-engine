@@ -160,7 +160,10 @@ const PgGenericSubscriptionPlugin: Plugin = function(
             : null), // If there's no node interface then we simply don't add node stuff
         }),
       };
-      const ListenPayload = newWithHooks(GraphQLObjectType, spec, {
+      const ListenPayload = newWithHooks<"GraphQLObjectType">(
+        GraphQLObjectType,
+        spec,
+        {
         isPgGenericSubscriptionPayloadType: true,
       });
 

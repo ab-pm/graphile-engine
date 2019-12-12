@@ -44,7 +44,6 @@ export {
   Options,
   BuildBase,
   Build,
-  Hook,
   WatchUnwatch,
   SchemaListener,
   InitObject,

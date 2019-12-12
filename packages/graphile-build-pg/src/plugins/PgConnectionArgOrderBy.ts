@@ -65,7 +65,7 @@ export default (function PgConnectionArgOrderBy(builder, { orderByNullsLast }) {
 
         const tableTypeName = inflection.tableType(table);
         /* const TableOrderByType = */
-        newWithHooks(
+        newWithHooks<"GraphQLEnumType">(
           GraphQLEnumType,
           {
             name: inflection.orderByType(tableTypeName),

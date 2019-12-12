@@ -198,10 +198,9 @@ export default (function PgRecordReturnTypesPlugin(builder) {
           isRecordReturnType: true,
           pgIntrospection: proc,
         };
-        newWithHooks(
+        newWithHooks<"GraphQLObjectType">(
           GraphQLObjectType,
           recordReturnSpec,
-
           recordReturnScope
         );
       });

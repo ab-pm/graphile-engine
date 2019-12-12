@@ -24,7 +24,7 @@ export default (async function MutationPlugin(builder) {
         graphql: { GraphQLObjectType },
         inflection,
       } = build;
-      const Mutation = newWithHooks(
+      const Mutation = newWithHooks<"GraphQLObjectType">(
         GraphQLObjectType,
         {
           name: inflection.builtin("Mutation"),

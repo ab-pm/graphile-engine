@@ -31,7 +31,7 @@ export default (function PgConnectionArgCondition(builder) {
 
         const tableTypeName = inflection.tableType(table);
         /* const TableConditionType = */
-        newWithHooks(
+        newWithHooks<"GraphQLInputObjectType">(
           GraphQLInputObjectType,
           {
             description: `A condition to be used against \`${tableTypeName}\` object types. All fields are tested for equality and combined with a logical ‘and.’`,

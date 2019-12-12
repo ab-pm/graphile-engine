@@ -532,7 +532,7 @@ export default function makeProcField(
 
         const isNotVoid = String(returnType.id) !== "2278";
         // If set then plural name
-        PayloadType = newWithHooks(
+        PayloadType = newWithHooks<"GraphQLObjectType">(
           GraphQLObjectType,
           {
             name: inflection.functionPayloadType(proc),
@@ -607,17 +607,21 @@ export default function makeProcField(
             ...args,
           },
         };
-        const InputType = newWithHooks(GraphQLInputObjectType, inputTypeSpec, {
-          __origin: `Adding mutation function input type for ${describePgEntity(
-            proc
-          )}. You can rename the function's GraphQL field (and its dependent types) via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
-            proc,
-            {
-              name: "newNameHere",
-            }
-          )}`,
-          isMutationInput: true,
-        });
+        const InputType = newWithHooks<"GraphQLInputObjectType">(
+          GraphQLInputObjectType,
+          inputTypeSpec,
+          {
+            __origin: `Adding mutation function input type for ${describePgEntity(
+              proc
+            )}. You can rename the function's GraphQL field (and its dependent types) via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
+              proc,
+              {
+                name: "newNameHere",
+              }
+            )}`,
+            isMutationInput: true,
+          }
+        );
         if (!InputType) {
           throw new Error(
             `Failed to construct InputType '${inputTypeSpec.name}'`

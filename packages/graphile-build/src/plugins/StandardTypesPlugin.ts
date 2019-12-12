@@ -91,7 +91,7 @@ export default (function StandardTypesPlugin(builder) {
       };
       // https://facebook.github.io/relay/graphql/connections.htm#sec-undefined.PageInfo
       /* const PageInfo = */
-      newWithHooks(GraphQLObjectType, spec, scope);
+      newWithHooks<"GraphQLObjectType">(GraphQLObjectType, spec, scope);
 
       return _;
     },

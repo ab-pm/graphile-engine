@@ -292,7 +292,7 @@ export default function makeExtendSchemaPlugin(
             directives,
             ...(directives.scope || {}),
           };
-          newWithHooks(type, { name, values, description }, scope);
+          newWithHooks<"GraphQLEnumType">(type, { name, values, description }, scope);
         } else if (type === GraphQLObjectType) {
           // https://graphql.org/graphql-js/type/#graphqlobjecttype
           const name = getName(definition.name);
@@ -321,7 +321,7 @@ export default function makeExtendSchemaPlugin(
                 }
               : null),
           };
-          newWithHooks(type, spec, scope);
+          newWithHooks<"GraphQLObjectType">(type, spec, scope);
         } else if (type === GraphQLInputObjectType) {
           // https://graphql.org/graphql-js/type/#graphqlinputobjecttype
           const name = getName(definition.name);
@@ -332,7 +332,7 @@ export default function makeExtendSchemaPlugin(
             directives,
             ...(directives.scope || {}),
           };
-          newWithHooks(
+          newWithHooks<"GraphQLInputObjectType">(
             type,
             {
               name,
@@ -380,7 +380,7 @@ export default function makeExtendSchemaPlugin(
             ...(resolveType ? { resolveType } : null),
             ...(description ? { description } : null),
           };
-          newWithHooks(type, spec, scope);
+          newWithHooks<"GraphQLUnionType">(type, spec, scope);
         } else if (type === GraphQLScalarType) {
           const name = getName(definition.name);
           const description = getDescription(definition.description);
@@ -390,7 +390,7 @@ export default function makeExtendSchemaPlugin(
             directives,
             ...(directives.scope || {}),
           };
-          newWithHooks(
+          newWithHooks<"GraphQLScalarType">(
             type,
             {
               name,

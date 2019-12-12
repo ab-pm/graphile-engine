@@ -202,7 +202,11 @@ export default (function PgTablesPlugin(
                 types: [],
                 // resolveType() {},
               };
-              TableType = newWithHooks(GraphQLUnionType, tableSpec, scope);
+              TableType = newWithHooks<"GraphQLUnionType">(
+                GraphQLUnionType,
+                tableSpec,
+                scope
+              );
             } else if (isInterfaceType) {
               const tableSpec: GraphileInterfaceTypeConfig<any, any> = {
                 name: tableTypeName,
@@ -211,7 +215,11 @@ export default (function PgTablesPlugin(
                 fields: {},
                 // resolveType() {},
               };
-              TableType = newWithHooks(GraphQLInterfaceType, tableSpec, scope);
+              TableType = newWithHooks<"GraphQLInterfaceType">(
+                GraphQLInterfaceType,
+                tableSpec,
+                scope
+              );
             } else {
               const tableSpec: GraphileObjectTypeConfig<any, any> = {
                 description,
@@ -287,7 +295,11 @@ export default (function PgTablesPlugin(
                 },
               };
 
-              TableType = newWithHooks(GraphQLObjectType, tableSpec, scope);
+              TableType = newWithHooks<"GraphQLObjectType">(
+                GraphQLObjectType,
+                tableSpec,
+                scope
+              );
             }
             if (!TableType) {
               throw new Error(
@@ -299,7 +311,7 @@ export default (function PgTablesPlugin(
               const pgCreateInputFields: FieldSpecMap = {};
               const pgPatchInputFields: FieldSpecMap = {};
               const pgBaseInputFields: FieldSpecMap = {};
-              newWithHooks(
+              newWithHooks<"GraphQLInputObjectType">(
                 GraphQLInputObjectType,
                 {
                   description: `An input for mutations affecting \`${tableTypeName}\``,
@@ -344,7 +356,7 @@ export default (function PgTablesPlugin(
                 // them; so we have to register them ahead of time. A better
                 // approach is to use the modifier to specify the type you need,
                 // 'patch' or 'base', so they can be registered just in time.
-                TablePatchType = newWithHooks(
+                TablePatchType = newWithHooks<"GraphQLInputObjectType">(
                   GraphQLInputObjectType,
                   {
                     description: `Represents an update to a \`${tableTypeName}\`. Fields that are set will be updated.`,
@@ -380,7 +392,7 @@ export default (function PgTablesPlugin(
                   },
                   true // Safe to skip this if no fields support updating
                 );
-                TableBaseInputType = newWithHooks(
+                TableBaseInputType = newWithHooks<"GraphQLInputObjectType">(
                   GraphQLInputObjectType,
                   {
                     description: `An input representation of \`${tableTypeName}\` with nullable fields.`,
@@ -569,20 +581,24 @@ export default (function PgTablesPlugin(
                 };
               },
             };
-            const EdgeType = newWithHooks(GraphQLObjectType, edgeSpec, {
-              __origin: `Adding table edge type for ${describePgEntity(
-                table
-              )}. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
-                table,
-                {
-                  name: "newNameHere",
-                }
-              )}`,
-              isEdgeType: true,
-              isPgRowEdgeType: true,
-              nodeType: TableType,
-              pgIntrospection: table,
-            });
+            const EdgeType = newWithHooks<"GraphQLObjectType">(
+              GraphQLObjectType,
+              edgeSpec,
+              {
+                __origin: `Adding table edge type for ${describePgEntity(
+                  table
+                )}. You can rename the table's GraphQL type via a 'Smart Comment':\n\n  ${sqlCommentByAddingTags(
+                  table,
+                  {
+                    name: "newNameHere",
+                  }
+                )}`,
+                isEdgeType: true,
+                isPgRowEdgeType: true,
+                nodeType: TableType,
+                pgIntrospection: table,
+              }
+            );
 
             if (!EdgeType) {
               throw new Error(
@@ -719,7 +735,11 @@ export default (function PgTablesPlugin(
               nodeType: TableType,
               pgIntrospection: table,
             };
-            newWithHooks(GraphQLObjectType, connectionSpec, connectionScope);
+            newWithHooks<"GraphQLObjectType">(
+              GraphQLObjectType,
+              connectionSpec,
+              connectionScope
+            );
           },
           true
         );

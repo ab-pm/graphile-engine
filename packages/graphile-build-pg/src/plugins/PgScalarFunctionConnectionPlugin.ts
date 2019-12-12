@@ -122,10 +122,9 @@ export default (function PgScalarFunctionConnectionPlugin(builder) {
           nodeType: NodeType,
           pgIntrospection: proc,
         };
-        const EdgeType = newWithHooks(
+        const EdgeType = newWithHooks<"GraphQLObjectType">(
           GraphQLObjectType,
           edgeSpec,
-
           edgeScope
         );
 
@@ -136,7 +135,7 @@ export default (function PgScalarFunctionConnectionPlugin(builder) {
         }
 
         /*const ConnectionType = */
-        newWithHooks(
+        newWithHooks<"GraphQLObjectType">(
           GraphQLObjectType,
           {
             name: inflection.scalarFunctionConnection(proc),

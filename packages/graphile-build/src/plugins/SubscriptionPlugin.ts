@@ -55,7 +55,7 @@ export default (async function SubscriptionPlugin(builder, { live }) {
         __origin: `graphile-build built-in (root subscription type)`,
         isRootSubscription: true,
       };
-      const Subscription = newWithHooks(GraphQLObjectType, spec, scope, true);
+      const Subscription = newWithHooks<"GraphQLObjectType">(GraphQLObjectType, spec, scope, true);
 
       if (isValidSubscription(Subscription)) {
         return extend(

@@ -73,7 +73,7 @@ export default (function PgJWTPlugin(
 
       // NOTE: we deliberately do not create an input type
       pgRegisterGqlTypeByTypeId(compositeType.id, cb => {
-        const JWTType = newWithHooks(
+        const JWTType = newWithHooks<"GraphQLScalarType">(
           GraphQLScalarType,
           {
             name: compositeTypeName,

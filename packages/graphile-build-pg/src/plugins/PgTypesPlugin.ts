@@ -369,7 +369,7 @@ export default (function PgTypesPlugin(
       const intervalScope: ScopeGraphQLObjectType = {
         isIntervalType: true,
       };
-      const GQLInterval = newWithHooks(
+      const GQLInterval = newWithHooks<"GraphQLObjectType">(
         GraphQLObjectType,
         intervalSpec,
         intervalScope
@@ -379,7 +379,7 @@ export default (function PgTypesPlugin(
         addType(GQLInterval, "graphile-build-pg built-in");
       }
 
-      const GQLIntervalInput = newWithHooks(
+      const GQLIntervalInput = newWithHooks<"GraphQLInputObjectType">(
         GraphQLInputObjectType,
         {
           name: inflection.inputType(inflection.builtin("Interval")),
@@ -562,7 +562,7 @@ export default (function PgTypesPlugin(
       const TimeType = SimpleTime; // GraphQLTime
 
       // 'point' in PostgreSQL is a 16-byte type that's comprised of two 8-byte floats.
-      const Point = newWithHooks(
+      const Point = newWithHooks<"GraphQLObjectType">(
         GraphQLObjectType,
         {
           name: inflection.builtin("Point"),
@@ -582,7 +582,7 @@ export default (function PgTypesPlugin(
         }
       );
 
-      const PointInput = newWithHooks(
+      const PointInput = newWithHooks<"GraphQLInputObjectType">(
         GraphQLInputObjectType,
         {
           name: inflection.inputType(inflection.builtin("Point")),
@@ -793,10 +793,14 @@ export default (function PgTypesPlugin(
               return memo;
             }, {}),
           };
-          const enumType = newWithHooks(GraphQLEnumType, enumSpec, {
-            pgIntrospection: type,
-            isPgEnumType: true,
-          });
+          const enumType = newWithHooks<"GraphQLEnumType">(
+            GraphQLEnumType,
+            enumSpec,
+            {
+              pgIntrospection: type,
+              isPgEnumType: true,
+            }
+          );
           if (enumType) {
             gqlTypeByTypeIdAndModifier[type.id][typeModifierKey] = enumType;
           }
@@ -849,7 +853,7 @@ export default (function PgTypesPlugin(
                 },
               },
             };
-            const RangeBound = newWithHooks(
+            const RangeBound = newWithHooks<"GraphQLObjectType">(
               GraphQLObjectType,
               rangeBoundSpec,
 
@@ -884,7 +888,7 @@ export default (function PgTypesPlugin(
                 },
               },
             };
-            const RangeBoundInput = newWithHooks(
+            const RangeBoundInput = newWithHooks<"GraphQLInputObjectType">(
               GraphQLInputObjectType,
               rangeBoundInputSpec,
 
@@ -922,7 +926,11 @@ export default (function PgTypesPlugin(
               pgSubtypeIntrospection: subtype,
               pgTypeModifier: typeModifier,
             };
-            Range = newWithHooks(GraphQLObjectType, rangeSpec, rangeScope);
+            Range = newWithHooks<"GraphQLObjectType">(
+              GraphQLObjectType,
+              rangeSpec,
+              rangeScope
+            );
             if (!Range) {
               throw new Error(
                 `Failed to construct range type '${rangeSpec.name}'`
@@ -944,7 +952,7 @@ export default (function PgTypesPlugin(
                 },
               },
             };
-            RangeInput = newWithHooks(
+            RangeInput = newWithHooks<"GraphQLInputObjectType">(
               GraphQLInputObjectType,
               rangeInputSpec,
 

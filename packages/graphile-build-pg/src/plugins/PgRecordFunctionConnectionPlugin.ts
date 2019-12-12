@@ -132,7 +132,11 @@ export default (function PgRecordFunctionConnectionPlugin(
           nodeType: NodeType,
           pgIntrospection: proc,
         };
-        const EdgeType = newWithHooks(GraphQLObjectType, edgeSpec, edgeScope);
+        const EdgeType = newWithHooks<"GraphQLObjectType">(
+          GraphQLObjectType,
+          edgeSpec,
+          edgeScope
+        );
 
         if (!EdgeType) {
           throw new Error(
@@ -141,7 +145,7 @@ export default (function PgRecordFunctionConnectionPlugin(
         }
 
         /*const ConnectionType = */
-        newWithHooks(
+        newWithHooks<"GraphQLObjectType">(
           GraphQLObjectType,
           {
             name: inflection.recordFunctionConnection(proc),

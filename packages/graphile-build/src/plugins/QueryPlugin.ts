@@ -26,7 +26,7 @@ export default (async function QueryPlugin(builder) {
         graphql: { GraphQLObjectType, GraphQLNonNull },
         inflection,
       } = build;
-      const queryType = newWithHooks(
+      const queryType = newWithHooks<"GraphQLObjectType">(
         GraphQLObjectType,
         {
           description:

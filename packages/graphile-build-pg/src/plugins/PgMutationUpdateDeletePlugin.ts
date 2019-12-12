@@ -344,10 +344,9 @@ returning *`;
                   isPgDeletePayloadType: mode === "delete",
                   pgIntrospection: table,
                 };
-                const PayloadType = newWithHooks(
+                const PayloadType = newWithHooks<"GraphQLObjectType">(
                   GraphQLObjectType,
                   payloadSpec,
-
                   payloadScope
                 );
 
@@ -359,7 +358,7 @@ returning *`;
                   const fieldName = inflection[
                     mode === "update" ? "updateNode" : "deleteNode"
                   ](table);
-                  const InputType = newWithHooks(
+                  const InputType = newWithHooks<"GraphQLInputObjectType">(
                     GraphQLInputObjectType,
                     {
                       description: `All input for the \`${fieldName}\` mutation.`,
@@ -532,7 +531,7 @@ returning *`;
                   const fieldName = inflection[
                     mode === "update" ? "updateByKeys" : "deleteByKeys"
                   ](keys, table, constraint);
-                  const InputType = newWithHooks(
+                  const InputType = newWithHooks<"GraphQLInputObjectType">(
                     GraphQLInputObjectType,
                     {
                       description: `All input for the \`${fieldName}\` mutation.`,

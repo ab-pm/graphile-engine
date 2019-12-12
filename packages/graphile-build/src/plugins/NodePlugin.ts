@@ -1,8 +1,6 @@
 import {
   Plugin,
   ResolvedLookAhead,
-  Hook,
-  ContextGraphQLObjectTypeInterfaces,
   GraphileResolverContext,
 } from "../SchemaBuilder";
 import { ResolveTree } from "graphql-parse-resolve-info";
@@ -110,7 +108,7 @@ export default (function NodePlugin(
         inflection,
       } = build;
       let Query: import("graphql").GraphQLObjectType | null = null;
-      newWithHooks(
+      newWithHooks<"GraphQLInterfaceType">(
         GraphQLInterfaceType,
         {
           name: inflection.builtin("Node"),
@@ -150,11 +148,7 @@ export default (function NodePlugin(
 
   builder.hook(
     "GraphQLObjectType:interfaces",
-    function addNodeIdToQuery(
-      interfaces: Array<import("graphql").GraphQLInterfaceTypeConfig<any, any>>,
-      build,
-      context
-    ) {
+    function addNodeIdToQuery(interfaces, build, context) {
       const { getTypeByName, inflection } = build;
       const {
         scope: { isRootQuery },
@@ -174,10 +168,7 @@ export default (function NodePlugin(
       } else {
         return interfaces;
       }
-    } as Hook<
-      Array<import("graphql").GraphQLInterfaceTypeConfig<any, any>>,
-      ContextGraphQLObjectTypeInterfaces
-    >,
+    },
     ["Node"]
   );
 

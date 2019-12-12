@@ -89,7 +89,7 @@ export default (function PgMutationCreatePlugin(
             );
           }
           const tableTypeName = inflection.tableType(table);
-          const InputType = newWithHooks(
+          const InputType = newWithHooks<"GraphQLInputObjectType">(
             GraphQLInputObjectType,
             {
               name: inflection.createInputType(table),
@@ -129,7 +129,7 @@ export default (function PgMutationCreatePlugin(
             }
           );
 
-          const PayloadType = newWithHooks(
+          const PayloadType = newWithHooks<"GraphQLObjectType">(
             GraphQLObjectType,
             {
               name: inflection.createPayloadType(table),
